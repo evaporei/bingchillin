@@ -12,7 +12,7 @@
  */
 
 #ifdef DA_IMPLEMENTATION
-#define DA_INITIAL_SIZE 1
+#define DA_INITIAL_SIZE 8
 
 #define da_init(da)         \
     do {                    \

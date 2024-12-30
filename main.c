@@ -31,6 +31,7 @@ typedef struct {
     size_t cx;
     Buffer buffer;
     Lines  lines;
+    size_t row;
 
     int fontSize;
     Font font;
@@ -65,13 +66,12 @@ void editor_cursor_left(Editor *e)
 
 void editor_cursor_down(Editor *e)
 {
-    size_t row = editor_get_cursor_row(e);
-    Line line = e->lines.items[row];
+    Line line = e->lines.items[e->row];
     size_t col = e->cx - line.start;
 
-    if (row+1 > e->lines.count - 1) return;
+    if (e->row+1 > e->lines.count - 1) return;
 
-    Line nextLine = e->lines.items[row+1];
+    Line nextLine = e->lines.items[e->row+1];
     size_t nextLineSize = nextLine.end - nextLine.start;
 
     if (nextLineSize >= col)
@@ -82,19 +82,30 @@ void editor_cursor_down(Editor *e)
 
 void editor_cursor_up(Editor *e)
 {
-    size_t row = editor_get_cursor_row(e);
-    Line line = e->lines.items[row];
+    Line line = e->lines.items[e->row];
     size_t col = e->cx - line.start;
 
-    if (row == 0) return;
+    if (e->row == 0) return;
 
-    Line prevLine = e->lines.items[row-1];
+    Line prevLine = e->lines.items[e->row-1];
     size_t prevLineSize = prevLine.end - prevLine.start;
 
     if (prevLineSize >= col)
         e->cx = prevLine.start + col;
     else
         e->cx = prevLine.end;
+}
+
+void editor_cursor_to_line_start(Editor *e)
+{
+    Line line = e->lines.items[e->row];
+    e->cx = line.start;
+}
+
+void editor_cursor_to_line_end(Editor *e)
+{
+    Line line = e->lines.items[e->row];
+    e->cx = line.end;
 }
 
 void editor_calculate_lines(Editor *e)
@@ -171,6 +182,38 @@ void editor_remove_char_at_cursor(Editor *e)
     editor_calculate_lines(e);
 }
 
+void editor_load_file(Editor *e, const char *filename)
+{
+    // get size of the file
+    FILE *f = fopen(filename, "r");
+    if (f == NULL)
+    {
+        perror("Error opening file");
+        assert(0);
+    }
+
+    fseek(f, 0L, SEEK_END);
+    long size = ftell(f);
+    rewind(f); // set cursor back to beginning?
+    printf("size of file(%s):%ld\n", filename, size);
+    
+    // allocate that much memory in the buffer
+    da_reserve(&e->buffer, size);
+
+    // copy file's contents to buffer
+    fread(e->buffer.items, 1, size, f);
+    e->buffer.count = size;
+
+    // remember to close file
+    fclose(f);
+    editor_calculate_lines(e);
+}
+
+void editor_save_file(Editor *e)
+{
+    // write the buffer to the previously opened file
+}
+
 Editor ed = {0};
 
 void init_editor()
@@ -180,6 +223,7 @@ void init_editor()
     da_init(&ed.buffer);
     ed.lines = (Lines) {0};
     da_init(&ed.lines);
+    ed.row = 0;
 
     ed.font = LoadFont("monogram.ttf");
     ed.fontSize = ed.font.baseSize;
@@ -210,6 +254,18 @@ void update()
     {
         LOG("Cursor up");
         editor_cursor_up(&ed);
+    }
+
+    if (IsKeyPressed(KEY_HOME))
+    {
+        LOG("Home key pressed");
+        editor_cursor_to_line_start(&ed);
+    }
+
+    if (IsKeyPressed(KEY_END))
+    {
+        LOG("End key pressed");
+        editor_cursor_to_line_end(&ed);
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
@@ -248,6 +304,8 @@ void update()
         LOG("%c - character pressed", key);
         editor_insert_char_at_cursor(&ed, key);
     }
+
+    ed.row = editor_get_cursor_row(&ed);
 }
 
 void draw()
@@ -271,13 +329,12 @@ void draw()
         }
         
         { // Rendering cursor (atleast trying to)
-            size_t row = editor_get_cursor_row(&ed);
-            Line line = ed.lines.items[row];
+            Line line = ed.lines.items[ed.row];
             size_t col = ed.cx - line.start;
 
             int characterWidth = MeasureTextEx(ed.font, "a", ed.fontSize, 0).x;
             int cursorX = col * characterWidth;
-            int cursorY = row * ed.fontSize;
+            int cursorY = ed.row * ed.fontSize;
 
 
             DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + ed.fontSize, PINK);
@@ -286,13 +343,18 @@ void draw()
         EndDrawing();
 }
 
-int main()
+int main(int argc, char **argv)
 {
     InitWindow(800, 600, "the bingchillin text editor");
     SetTargetFPS(60);
     SetTraceLogLevel(LOG_DEBUG);
 
     init_editor();
+
+    if (argc > 1) {
+        printf("Opening file\n");
+        editor_load_file(&ed, argv[1]);
+    }
     
     while(!WindowShouldClose())
     {
