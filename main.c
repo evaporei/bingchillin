@@ -31,14 +31,28 @@ typedef struct {
     size_t cx;
     Buffer buffer;
     Lines  lines;
-    size_t currentLine;
 
     int fontSize;
     Font font;
 } Editor;
 
+size_t editor_get_cursor_row(Editor *e)
+{
+    assert(e->lines.count > 0);
+
+    for (size_t i=0; i<e->lines.count; i++)
+    {
+        Line line = e->lines.items[i];
+        if (e->cx >= line.start && e->cx <= line.end)
+            return i;
+    }
+    // return the last line/row
+    return e->lines.count - 1;
+}
+
 void editor_cursor_right(Editor *e)
 {
+    if (e->buffer.count == 0) return;
     if (e->cx > e->buffer.count - 1) return;
     e->cx++;
 }
@@ -47,6 +61,40 @@ void editor_cursor_left(Editor *e)
 {
     if (e->cx == 0) return;
     e->cx--;
+}
+
+void editor_cursor_down(Editor *e)
+{
+    size_t row = editor_get_cursor_row(e);
+    Line line = e->lines.items[row];
+    size_t col = e->cx - line.start;
+
+    if (row+1 > e->lines.count - 1) return;
+
+    Line nextLine = e->lines.items[row+1];
+    size_t nextLineSize = nextLine.end - nextLine.start;
+
+    if (nextLineSize >= col)
+        e->cx = nextLine.start + col;
+    else
+        e->cx = nextLine.end;
+}
+
+void editor_cursor_up(Editor *e)
+{
+    size_t row = editor_get_cursor_row(e);
+    Line line = e->lines.items[row];
+    size_t col = e->cx - line.start;
+
+    if (row == 0) return;
+
+    Line prevLine = e->lines.items[row-1];
+    size_t prevLineSize = prevLine.end - prevLine.start;
+
+    if (prevLineSize >= col)
+        e->cx = prevLine.start + col;
+    else
+        e->cx = prevLine.end;
 }
 
 void editor_calculate_lines(Editor *e)
@@ -65,6 +113,8 @@ void editor_calculate_lines(Editor *e)
         }
     }
 
+    // there's always atleast one line 
+    // a lot of code depends upon that assumption
     da_append(&e->lines, ((Line){
         line.start,
         e->buffer.count,
@@ -130,10 +180,10 @@ void init_editor()
     da_init(&ed.buffer);
     ed.lines = (Lines) {0};
     da_init(&ed.lines);
-    ed.currentLine = 0;
 
     ed.font = LoadFont("monogram.ttf");
     ed.fontSize = ed.font.baseSize;
+    editor_calculate_lines(&ed);
 }
 
 void update()
@@ -150,6 +200,18 @@ void update()
         editor_cursor_left(&ed);
     }
 
+    if (IsKeyPressed(KEY_DOWN) || IsKeyPressedRepeat(KEY_DOWN))
+    {
+        LOG("Cursor down");
+        editor_cursor_down(&ed);
+    }
+
+    if (IsKeyPressed(KEY_UP) || IsKeyPressedRepeat(KEY_UP))
+    {
+        LOG("Cursor up");
+        editor_cursor_up(&ed);
+    }
+
     if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
     {
         if (IsKeyPressed(KEY_EQUAL)) ed.fontSize++;
@@ -160,6 +222,12 @@ void update()
     {
         LOG("Enter key pressed");
         editor_insert_char_at_cursor(&ed, '\n');
+    }
+
+    if (IsKeyPressed(KEY_TAB))
+    {
+        LOG("Tab key pressed");
+        for (int i=0; i<4; i++) editor_insert_char_at_cursor(&ed, ' ');
     }
 
     if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE))
@@ -187,18 +255,34 @@ void draw()
         BeginDrawing();
         ClearBackground(BLACK);
 
-        for (size_t i=0; i<ed.lines.count; i++)
-        {
-            Line line = ed.lines.items[i];
+        { // Rendering text from buffer
+            for (size_t i=0; i<ed.lines.count; i++)
+            {
+                Line line = ed.lines.items[i];
 
-            const char* lineStart = ed.buffer.items + line.start;
-            const size_t lineSize = line.end - line.start;
-            char *text = malloc(lineSize + 1);
-            memcpy(text, lineStart, lineSize);
-            text[lineSize] = '\0';
-            DrawTextEx(ed.font, text, (Vector2){0, ed.fontSize*i}, ed.fontSize, 2, GREEN);
-            free(text);
+                const char* lineStart = ed.buffer.items + line.start;
+                const size_t lineSize = line.end - line.start;
+                char *text = malloc(lineSize + 1);
+                memcpy(text, lineStart, lineSize);
+                text[lineSize] = '\0';
+                DrawTextEx(ed.font, text, (Vector2){0, ed.fontSize*i}, ed.fontSize, 0, GREEN);
+                free(text);
+            }
         }
+        
+        { // Rendering cursor (atleast trying to)
+            size_t row = editor_get_cursor_row(&ed);
+            Line line = ed.lines.items[row];
+            size_t col = ed.cx - line.start;
+
+            int characterWidth = MeasureTextEx(ed.font, "a", ed.fontSize, 0).x;
+            int cursorX = col * characterWidth;
+            int cursorY = row * ed.fontSize;
+
+
+            DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + ed.fontSize, PINK);
+        }
+
         EndDrawing();
 }
 
