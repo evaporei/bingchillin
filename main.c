@@ -147,6 +147,9 @@ void editor_init(Editor *e)
     e->lines = (Lines) {0};
     da_init(&e->lines);
     e->row = 0;
+
+    e->scrollX = 0;
+    e->scrollY = 0;
     
     e->filename = NULL;
 
@@ -336,9 +339,41 @@ void update(Editor *e)
         LOG("%c - character pressed", key);
         editor_insert_char_at_cursor(e, key);
     }
+    
+    
+    { // Update Editor members
+        e->row = editor_get_cursor_row(e);
+        e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
+    }
 
-    e->row = editor_get_cursor_row(e);
-    e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
+    { // update editor scroll offset
+      // NOTE: do not use old e->row
+
+        // X offset calculation
+        Line line = e->lines.items[e->row]; 
+        int col = e->cx - line.start;
+        int lineWidthUptoCursor = col * e->charWidth;
+
+        if (col*e->charWidth > GetScreenWidth())
+        {
+            int xDelta = GetScreenWidth() - lineWidthUptoCursor;
+            e->scrollX = xDelta-1;
+        } else
+        {
+            e->scrollX = 0;
+        }
+
+        // Y offset calulation
+        int lineHeight = (e->row+1)* e->fontSize;
+        if (lineHeight > GetScreenHeight())
+        {
+            int yDelta = GetScreenHeight() - lineHeight;
+            e->scrollY = yDelta;
+        } else
+        {
+            e->scrollY = 0;
+        }
+    }
 }
 
 void draw(Editor *e)
@@ -356,14 +391,14 @@ void draw(Editor *e)
                 char *text = malloc(lineSize + 1);
                 memcpy(text, lineStart, lineSize);
                 text[lineSize] = '\0';
-                DrawTextEx(
-                    e->font, text,
-                    (Vector2) {
-                        0+e->scrollX,
-                        (e->fontSize*i)+e->scrollY
-                    },
-                    e->fontSize, 0, GREEN
-                );
+                Vector2 pos = (Vector2) {
+                    0+e->scrollX,
+                    (int)(e->fontSize*i) + e->scrollY,
+                    // NOTE: i being size_t causes HUGE(obviously) underflow on line 0 when scrollY < 0
+                    // -  solution cast to (int): may cause issue later (pain) :( 
+                };
+
+                DrawTextEx( e->font, text, pos, e->fontSize, 0, GREEN);
                 free(text);
             }
         }
@@ -372,8 +407,8 @@ void draw(Editor *e)
             Line line = e->lines.items[e->row];
             size_t col = e->cx - line.start;
 
-            int cursorX = col * e->charWidth;
-            int cursorY = e->row * e->fontSize;
+            int cursorX = col * e->charWidth + e->scrollX;
+            int cursorY = e->row * e->fontSize + e->scrollY;
 
             DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + e->fontSize, PINK);
         }
