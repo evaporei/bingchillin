@@ -2,6 +2,8 @@
 
 Just writing this for fun in C with raylib for rendering.
 
+![image](screenshot.png)
+
 ## Controls
 
 
