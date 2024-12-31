@@ -402,6 +402,8 @@ int main(int argc, char **argv)
         draw(&editor);
     }
 
+    editor_deinit(&editor);
     CloseWindow();
+
     return 0;
 }
