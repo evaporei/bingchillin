@@ -32,10 +32,14 @@ typedef struct {
     Buffer buffer;
     Lines  lines;
     size_t row;
+
+    int scrollX;
+    int scrollY;
     
     const char * filename;
 
     int fontSize;
+    int charWidth;
     Font font;
 } Editor;
 
@@ -134,13 +138,39 @@ void editor_calculate_lines(Editor *e)
     }));
 }
 
+// Initialize Editor struct
+void editor_init(Editor *e)
+{
+    e->cx = 0;
+    e->buffer = (Buffer) {0};
+    da_init(&e->buffer);
+    e->lines = (Lines) {0};
+    da_init(&e->lines);
+    e->row = 0;
+    
+    e->filename = NULL;
+
+    e->font = LoadFont("monogram.ttf");
+    e->fontSize = e->font.baseSize;
+    e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
+
+    editor_calculate_lines(e);
+}
+
+void editor_deinit(Editor *e)
+{
+    da_free(&e->buffer);
+    da_free(&e->lines);
+    UnloadFont(e->font);
+}
+
 void editor_insert_char_at_cursor(Editor *e, char c)
 {
-    da_append(&e->buffer, '\0');
+    da_append(&e->buffer, '\0'); // increases count by one
     // move memory from cursor to end right by one
     char *src = e->buffer.items + e->cx;
     char *dest = src + 1;
-    size_t len = e->buffer.count - e->cx;
+    size_t len = e->buffer.count - 1 - e->cx;
 
     memmove(dest, src, len);
     // set the char on cursor pos
@@ -231,134 +261,121 @@ void editor_save_file(Editor *e)
     fclose(f);
 }
 
-Editor ed = {0};
-
-void init_editor()
-{
-    ed.cx = 0;
-    ed.buffer = (Buffer) {0};
-    da_init(&ed.buffer);
-    ed.lines = (Lines) {0};
-    da_init(&ed.lines);
-    ed.row = 0;
-    
-    ed.filename = NULL;
-
-    ed.font = LoadFont("monogram.ttf");
-    ed.fontSize = ed.font.baseSize;
-
-    editor_calculate_lines(&ed);
-}
-
-void update()
+void update(Editor *e)
 {
     if (IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT))
     {
         LOG("Cursor right");
-        editor_cursor_right(&ed);
+        editor_cursor_right(e);
     }
 
     if (IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT))
     {
         LOG("Cursor left");
-        editor_cursor_left(&ed);
+        editor_cursor_left(e);
     }
 
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressedRepeat(KEY_DOWN))
     {
         LOG("Cursor down");
-        editor_cursor_down(&ed);
+        editor_cursor_down(e);
     }
 
     if (IsKeyPressed(KEY_UP) || IsKeyPressedRepeat(KEY_UP))
     {
         LOG("Cursor up");
-        editor_cursor_up(&ed);
+        editor_cursor_up(e);
     }
 
     if (IsKeyPressed(KEY_HOME))
     {
         LOG("Home key pressed");
-        editor_cursor_to_line_start(&ed);
+        editor_cursor_to_line_start(e);
     }
 
     if (IsKeyPressed(KEY_END))
     {
         LOG("End key pressed");
-        editor_cursor_to_line_end(&ed);
+        editor_cursor_to_line_end(e);
     }
 
     if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
     {
-        if (IsKeyPressed(KEY_EQUAL)) ed.fontSize++;
-        if (IsKeyPressed(KEY_MINUS)) ed.fontSize--;
-        if (IsKeyPressed(KEY_S)) editor_save_file(&ed);
+        if (IsKeyPressed(KEY_EQUAL)) e->fontSize++;
+        if (IsKeyPressed(KEY_MINUS)) e->fontSize--;
+        if (IsKeyPressed(KEY_S)) editor_save_file(e);
     }
 
     if (IsKeyPressed(KEY_ENTER))
     {
         LOG("Enter key pressed");
-        editor_insert_char_at_cursor(&ed, '\n');
+        editor_insert_char_at_cursor(e, '\n');
     }
 
     if (IsKeyPressed(KEY_TAB))
     {
         LOG("Tab key pressed");
-        for (int i=0; i<4; i++) editor_insert_char_at_cursor(&ed, ' ');
+        for (int i=0; i<4; i++) editor_insert_char_at_cursor(e, ' ');
     }
 
     if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE))
     {
         LOG("Backspace pressed");
-        editor_remove_char_before_cursor(&ed);
+        editor_remove_char_before_cursor(e);
     }
 
     if (IsKeyPressed(KEY_DELETE) || IsKeyPressedRepeat(KEY_DELETE))
     {
         LOG("Delete pressed");
-        editor_remove_char_at_cursor(&ed);
+        editor_remove_char_at_cursor(e);
     }
 
 
     char key = GetCharPressed();
     if (key) {
         LOG("%c - character pressed", key);
-        editor_insert_char_at_cursor(&ed, key);
+        editor_insert_char_at_cursor(e, key);
     }
 
-    ed.row = editor_get_cursor_row(&ed);
+    e->row = editor_get_cursor_row(e);
+    e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
 }
 
-void draw()
+void draw(Editor *e)
 {
         BeginDrawing();
         ClearBackground(BLACK);
 
         { // Rendering text from buffer
-            for (size_t i=0; i<ed.lines.count; i++)
+            for (size_t i=0; i<e->lines.count; i++)
             {
-                Line line = ed.lines.items[i];
+                Line line = e->lines.items[i];
 
-                const char* lineStart = ed.buffer.items + line.start;
+                const char* lineStart = e->buffer.items + line.start;
                 const size_t lineSize = line.end - line.start;
                 char *text = malloc(lineSize + 1);
                 memcpy(text, lineStart, lineSize);
                 text[lineSize] = '\0';
-                DrawTextEx(ed.font, text, (Vector2){0, ed.fontSize*i}, ed.fontSize, 0, GREEN);
+                DrawTextEx(
+                    e->font, text,
+                    (Vector2) {
+                        0+e->scrollX,
+                        (e->fontSize*i)+e->scrollY
+                    },
+                    e->fontSize, 0, GREEN
+                );
                 free(text);
             }
         }
         
         { // Rendering cursor (atleast trying to)
-            Line line = ed.lines.items[ed.row];
-            size_t col = ed.cx - line.start;
+            Line line = e->lines.items[e->row];
+            size_t col = e->cx - line.start;
 
-            int characterWidth = MeasureTextEx(ed.font, "a", ed.fontSize, 0).x;
-            int cursorX = col * characterWidth;
-            int cursorY = ed.row * ed.fontSize;
+            int cursorX = col * e->charWidth;
+            int cursorY = e->row * e->fontSize;
 
-
-            DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + ed.fontSize, PINK);
+            DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + e->fontSize, PINK);
         }
 
         EndDrawing();
@@ -370,17 +387,19 @@ int main(int argc, char **argv)
     SetTargetFPS(60);
     SetTraceLogLevel(LOG_DEBUG);
 
-    init_editor();
+    Editor editor = {0};
+
+    editor_init(&editor);
 
     if (argc > 1) {
         printf("Opening file\n");
-        editor_load_file(&ed, argv[1]);
+        editor_load_file(&editor, argv[1]);
     }
     
     while(!WindowShouldClose())
     {
-        update();
-        draw();
+        update(&editor);
+        draw(&editor);
     }
 
     CloseWindow();
