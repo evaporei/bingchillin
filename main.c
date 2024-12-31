@@ -349,30 +349,31 @@ void update(Editor *e)
     { // update editor scroll offset
       // NOTE: do not use old e->row
 
-        // X offset calculation
-        Line line = e->lines.items[e->row]; 
-        int col = e->cx - line.start;
-        int lineWidthUptoCursor = col * e->charWidth;
+        const int winWidth = GetScreenWidth();
+        const int winHeight = GetScreenHeight();
 
-        if (col*e->charWidth > GetScreenWidth())
-        {
-            int xDelta = GetScreenWidth() - lineWidthUptoCursor;
-            e->scrollX = xDelta-1;
-        } else
-        {
-            e->scrollX = 0;
-        }
+        // X offset calculation
+        const Line line = e->lines.items[e->row]; 
+        const int col = e->cx - line.start;
+        const int cursorX = col * e->charWidth;
+        const int winRight = winWidth - e->scrollX;
+        const int winLeft = 0 - e->scrollX;
+
+        if ( cursorX > winRight )
+            e->scrollX = winWidth-cursorX-1;
+        else if ( cursorX < winLeft )
+            e->scrollX = -cursorX;
 
         // Y offset calulation
-        int lineHeight = (e->row+1)* e->fontSize;
-        if (lineHeight > GetScreenHeight())
-        {
-            int yDelta = GetScreenHeight() - lineHeight;
-            e->scrollY = yDelta;
-        } else
-        {
-            e->scrollY = 0;
-        }
+        const int cursorTop = e->row* e->fontSize;
+        const int cursorBottom = cursorTop + e->fontSize;
+        const int winBottom = winHeight - e->scrollY;
+        const int winTop = 0 - e->scrollY;
+
+        if (cursorBottom > winBottom)
+            e->scrollY = winHeight - cursorBottom;
+        else if (cursorTop < winTop)
+            e->scrollY = -cursorTop;
     }
 }
 
