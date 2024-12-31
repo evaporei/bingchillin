@@ -32,6 +32,8 @@ typedef struct {
     Buffer buffer;
     Lines  lines;
     size_t row;
+    
+    const char * filename;
 
     int fontSize;
     Font font;
@@ -189,16 +191,16 @@ void editor_load_file(Editor *e, const char *filename)
     if (f == NULL)
     {
         perror("Error opening file");
-        assert(0);
+        exit(1);
     }
 
     fseek(f, 0L, SEEK_END);
-    long size = ftell(f);
+    long int size = ftell(f);
     rewind(f); // set cursor back to beginning?
     printf("size of file(%s):%ld\n", filename, size);
     
     // allocate that much memory in the buffer
-    da_reserve(&e->buffer, size);
+    da_reserve(&e->buffer, (size_t)size);
 
     // copy file's contents to buffer
     fread(e->buffer.items, 1, size, f);
@@ -206,12 +208,27 @@ void editor_load_file(Editor *e, const char *filename)
 
     // remember to close file
     fclose(f);
+
+    e->filename = filename;
     editor_calculate_lines(e);
 }
 
 void editor_save_file(Editor *e)
 {
+    LOG("Saving to filename: %s", e->filename);
+    if (e->filename == NULL) return;
+
+    // open file for writing
+    FILE *f = fopen(e->filename, "r+");
+    if (f == NULL)
+    {
+        perror("Error opening file");
+        exit(1);
+    }
     // write the buffer to the previously opened file
+    fwrite(e->buffer.items, 1, e->buffer.count, f);
+
+    fclose(f);
 }
 
 Editor ed = {0};
@@ -224,9 +241,12 @@ void init_editor()
     ed.lines = (Lines) {0};
     da_init(&ed.lines);
     ed.row = 0;
+    
+    ed.filename = NULL;
 
     ed.font = LoadFont("monogram.ttf");
     ed.fontSize = ed.font.baseSize;
+
     editor_calculate_lines(&ed);
 }
 
@@ -272,6 +292,7 @@ void update()
     {
         if (IsKeyPressed(KEY_EQUAL)) ed.fontSize++;
         if (IsKeyPressed(KEY_MINUS)) ed.fontSize--;
+        if (IsKeyPressed(KEY_S)) editor_save_file(&ed);
     }
 
     if (IsKeyPressed(KEY_ENTER))
