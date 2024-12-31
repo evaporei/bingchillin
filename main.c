@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <raylib.h>
@@ -100,6 +101,54 @@ void editor_cursor_up(Editor *e)
         e->cx = prevLine.start + col;
     else
         e->cx = prevLine.end;
+}
+
+void editor_cursor_to_next_word(Editor *e)
+{
+    bool foundWhitespace = false;
+
+    for (size_t i=e->cx; i<e->buffer.count; i++)
+    {
+        const char c = e->buffer.items[i];
+        const bool checkWhitespace = c==' ' || c=='\n';;
+
+        if (checkWhitespace)
+            foundWhitespace = true;
+
+        // check if char is whitespace
+        if (foundWhitespace && !checkWhitespace)
+        {
+            e->cx = i;
+            return;
+        }
+    }
+    // if no next word found
+    const Line line = e->lines.items[e->row];
+    e->cx = line.end;
+}
+
+void editor_cursor_to_prev_word(Editor *e)
+{
+    bool foundWhitespace = false;
+    
+    for (size_t i=e->cx; i!=0; i--)
+    {
+        const char c = e->buffer.items[i-1];
+        const bool checkWhitespace = c==' ' || c=='\n';;
+
+        if (checkWhitespace)
+            foundWhitespace = true;
+
+        // check if char is whitespace
+        if (foundWhitespace && !checkWhitespace)
+        {
+            e->cx = i;
+            return;
+        }
+    }
+    // no prev word found
+    const Line line = e->lines.items[e->row];
+    e->cx = line.start;
 }
 
 void editor_cursor_to_line_start(Editor *e)
@@ -219,6 +268,8 @@ void editor_remove_char_at_cursor(Editor *e)
 
 void editor_load_file(Editor *e, const char *filename)
 {
+    LOG("Opening file: %s", filename);
+
     // get size of the file
     FILE *f = fopen(filename, "r");
     if (f == NULL)
@@ -230,7 +281,7 @@ void editor_load_file(Editor *e, const char *filename)
     fseek(f, 0L, SEEK_END);
     long int size = ftell(f);
     rewind(f); // set cursor back to beginning?
-    printf("size of file(%s):%ld\n", filename, size);
+    LOG("size of file(%s):%ld\n", filename, size);
     
     // allocate that much memory in the buffer
     da_reserve(&e->buffer, (size_t)size);
@@ -264,27 +315,41 @@ void editor_save_file(Editor *e)
     fclose(f);
 }
 
+bool editor_key_pressed(KeyboardKey key)
+{
+    return IsKeyPressed(key) || IsKeyPressedRepeat(key);
+}
+
 void update(Editor *e)
 {
-    if (IsKeyPressed(KEY_RIGHT) || IsKeyPressedRepeat(KEY_RIGHT))
+    if (IsKeyDown(KEY_LEFT_CONTROL))
+    {
+        if (editor_key_pressed(KEY_EQUAL)) e->fontSize++;
+        if (editor_key_pressed(KEY_MINUS)) e->fontSize--;
+        if (IsKeyPressed(KEY_S)) editor_save_file(e);
+    }
+
+    if (editor_key_pressed(KEY_RIGHT))
     {
         LOG("Cursor right");
-        editor_cursor_right(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_next_word(e);
+        else editor_cursor_right(e);
     }
 
-    if (IsKeyPressed(KEY_LEFT) || IsKeyPressedRepeat(KEY_LEFT))
+    if (editor_key_pressed(KEY_LEFT))
     {
         LOG("Cursor left");
-        editor_cursor_left(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_prev_word(e);
+        else editor_cursor_left(e);
     }
 
-    if (IsKeyPressed(KEY_DOWN) || IsKeyPressedRepeat(KEY_DOWN))
+    if (editor_key_pressed(KEY_DOWN))
     {
         LOG("Cursor down");
         editor_cursor_down(e);
     }
 
-    if (IsKeyPressed(KEY_UP) || IsKeyPressedRepeat(KEY_UP))
+    if (editor_key_pressed(KEY_UP))
     {
         LOG("Cursor up");
         editor_cursor_up(e);
@@ -302,13 +367,6 @@ void update(Editor *e)
         editor_cursor_to_line_end(e);
     }
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
-    {
-        if (IsKeyPressed(KEY_EQUAL)) e->fontSize++;
-        if (IsKeyPressed(KEY_MINUS)) e->fontSize--;
-        if (IsKeyPressed(KEY_S)) editor_save_file(e);
-    }
-
     if (IsKeyPressed(KEY_ENTER))
     {
         LOG("Enter key pressed");
@@ -321,13 +379,13 @@ void update(Editor *e)
         for (int i=0; i<4; i++) editor_insert_char_at_cursor(e, ' ');
     }
 
-    if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE))
+    if (editor_key_pressed(KEY_BACKSPACE))
     {
         LOG("Backspace pressed");
         editor_remove_char_before_cursor(e);
     }
 
-    if (IsKeyPressed(KEY_DELETE) || IsKeyPressedRepeat(KEY_DELETE))
+    if (editor_key_pressed(KEY_DELETE))
     {
         LOG("Delete pressed");
         editor_remove_char_at_cursor(e);
@@ -421,14 +479,13 @@ int main(int argc, char **argv)
 {
     InitWindow(800, 600, "the bingchillin text editor");
     SetTargetFPS(60);
-    SetTraceLogLevel(LOG_DEBUG);
+    /*SetTraceLogLevel(LOG_DEBUG);*/
 
     Editor editor = {0};
 
     editor_init(&editor);
 
     if (argc > 1) {
-        printf("Opening file\n");
         editor_load_file(&editor, argv[1]);
     }
     
