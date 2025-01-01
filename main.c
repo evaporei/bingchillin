@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef BUILD_RELEASE
+#include "build/font.h"
+#endif
+
 #define DA_IMPLEMENTATION
 #include "dynamic_array.h"
 
@@ -202,7 +206,11 @@ void editor_init(Editor *e)
     
     e->filename = NULL;
 
+#ifdef BUILD_RELEASE
+    e->font = LoadFont_Font();
+#else
     e->font = LoadFont("monogram.ttf");
+#endif
     e->fontSize = e->font.baseSize;
     e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
 
@@ -213,7 +221,9 @@ void editor_deinit(Editor *e)
 {
     da_free(&e->buffer);
     da_free(&e->lines);
+#ifndef BUILD_RELEASE
     UnloadFont(e->font);
+#endif
 }
 
 void editor_insert_char_at_cursor(Editor *e, char c)
@@ -477,9 +487,13 @@ void draw(Editor *e)
 
 int main(int argc, char **argv)
 {
+#ifdef BUILD_RELEASE
+    SetTraceLogLevel(LOG_ERROR);
+#else
+    SetTraceLogLevel(LOG_DEBUG);
+#endif
     InitWindow(800, 600, "the bingchillin text editor");
     SetTargetFPS(60);
-    /*SetTraceLogLevel(LOG_DEBUG);*/
 
     Editor editor = {0};
 

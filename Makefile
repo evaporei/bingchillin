@@ -1,14 +1,17 @@
-TARGET := bingchillin
+BUILD_DIR := build/
+TARGET := $(BUILD_DIR)bingchillin
 SRCS := main.c
 
-CC = gcc
-CFLAGS = -Wall -Wextra -ggdb
-LDFLAGS := -lraylib
+CC := gcc
+INCFLAGS := -Iinclude
+CFLAGS := -Wall -Wextra -ggdb $(INCFLAGS)
+LDFLAGS := -Llib -lraylib -lm
 
 $(TARGET): $(SRCS)
-	gcc $^ $(CFLAGS) -o $@ $(LDFLAGS)
+	mkdir -p $(BUILD_DIR)
+	$(CC) $^ $(CFLAGS) -o $@ $(LDFLAGS)
 
-.PHONY: run debug clean
+.PHONY: run debug clean release
 run: $(TARGET)
 	./$<
 
@@ -18,5 +21,12 @@ debug: $(TARGET)
 val: $(TARGET)
 	valgrind ./$<
 
+release: $(SRCS)
+	mkdir -p $(BUILD_DIR)
+	$(CC) release.c $(INCFLAGS) -o $(BUILD_DIR)release $(LDFLAGS)
+	./$(BUILD_DIR)release
+	$(CC) $^ $(INCFLAGS) -DBUILD_RELEASE -o $(TARGET) $(LDFLAGS)
+
+
 clean:
-	rm $(TARGET)
+	rm $(BUILD_DIR) -rf
