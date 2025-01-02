@@ -254,8 +254,8 @@ void editor_remove_char_before_cursor(Editor *e)
     memmove(dest, src, len);
     
     // set cursor position & buffer count
-    if (e->cx > 0) e->cx--;
-    if (e->buffer.count > 0) e->buffer.count--;
+    e->cx--;
+    e->buffer.count--;
 
     editor_calculate_lines(e);
 }
@@ -270,8 +270,7 @@ void editor_remove_char_at_cursor(Editor *e)
     size_t len = e->buffer.count - (e->cx + 1);
     memmove(dest, src, len);
 
-    if (e->buffer.count > 0)
-        e->buffer.count--;
+    e->buffer.count--;
 
     editor_calculate_lines(e);
 }
@@ -313,7 +312,7 @@ void editor_save_file(Editor *e)
     if (e->filename == NULL) return;
 
     // open file for writing
-    FILE *f = fopen(e->filename, "r+");
+    FILE *f = fopen(e->filename, "w");
     if (f == NULL)
     {
         perror("Error opening file");
