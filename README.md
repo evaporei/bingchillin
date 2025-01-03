@@ -16,4 +16,11 @@ Just writing this for fun in C with raylib for rendering.
 |Backspace  |remove character before cursor|
 |Delete     |remove character at cursor    |
 |Enter      |insert a newline              |
+|Home       |Cursor to line beginning      |
+|End        |Cursor to line end            |
+|Ctrl Home  |Cursor to file beginning      |
+|Ctrl End   |Cursor to file end            |
 
+## TODO
+
+- [ ] display line numbers

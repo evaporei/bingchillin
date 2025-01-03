@@ -114,13 +114,13 @@ void editor_cursor_to_next_word(Editor *e)
     for (size_t i=e->cx; i<e->buffer.count; i++)
     {
         const char c = e->buffer.items[i];
-        const bool checkWhitespace = c==' ' || c=='\n';;
+        const bool checkWhitespace = c==' ' || c=='\n';
 
         if (checkWhitespace)
             foundWhitespace = true;
 
         // check if char is whitespace
-        if (foundWhitespace && !checkWhitespace)
+        if (foundWhitespace && ( !checkWhitespace || c=='\n' ))
         {
             e->cx = i;
             return;
@@ -138,13 +138,13 @@ void editor_cursor_to_prev_word(Editor *e)
     for (size_t i=e->cx; i!=0; i--)
     {
         const char c = e->buffer.items[i-1];
-        const bool checkWhitespace = c==' ' || c=='\n';;
+        const bool checkWhitespace = c==' ' || c=='\n';
 
         if (checkWhitespace)
             foundWhitespace = true;
 
         // check if char is whitespace
-        if (foundWhitespace && !checkWhitespace)
+        if (foundWhitespace && ( !checkWhitespace || c=='\n' ))
         {
             e->cx = i;
             return;
@@ -165,6 +165,18 @@ void editor_cursor_to_line_end(Editor *e)
 {
     Line line = e->lines.items[e->row];
     e->cx = line.end;
+}
+
+void editor_cursor_to_first_line(Editor *e)
+{
+    Line firstLine = e->lines.items[0];
+    e->cx = firstLine.start;
+}
+
+void editor_cursor_to_last_line(Editor *e)
+{
+    Line lastLine = e->lines.items[e->lines.count - 1];
+    e->cx = lastLine.end;
 }
 
 void editor_calculate_lines(Editor *e)
@@ -199,6 +211,7 @@ void editor_init(Editor *e)
     da_init(&e->buffer);
     e->lines = (Lines) {0};
     da_init(&e->lines);
+
     e->row = 0;
 
     e->scrollX = 0;
@@ -214,7 +227,8 @@ void editor_init(Editor *e)
     e->fontSize = e->font.baseSize;
     e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
 
-    editor_calculate_lines(e);
+    editor_calculate_lines(e); // NOTE: running this once results in there
+                               // being atleast one `Line`
 }
 
 void editor_deinit(Editor *e)
@@ -308,7 +322,7 @@ void editor_load_file(Editor *e, const char *filename)
 
 void editor_save_file(Editor *e)
 {
-    LOG("Saving to filename: %s", e->filename);
+    printf("Saving to filename: %s", e->filename);
     if (e->filename == NULL) return;
 
     // open file for writing
@@ -367,13 +381,15 @@ void update(Editor *e)
     if (IsKeyPressed(KEY_HOME))
     {
         LOG("Home key pressed");
-        editor_cursor_to_line_start(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_first_line(e);
+        else editor_cursor_to_line_start(e);
     }
 
     if (IsKeyPressed(KEY_END))
     {
         LOG("End key pressed");
-        editor_cursor_to_line_end(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_last_line(e);
+        else editor_cursor_to_line_end(e);
     }
 
     if (IsKeyPressed(KEY_ENTER))
@@ -492,6 +508,8 @@ int main(int argc, char **argv)
     SetTraceLogLevel(LOG_DEBUG);
 #endif
     InitWindow(800, 600, "the bingchillin text editor");
+    SetWindowState(FLAG_WINDOW_RESIZABLE); // NOTE: not fully tested with resizing enabled
+                                           // might cause some bugs
     SetTargetFPS(60);
 
     Editor editor = {0};
