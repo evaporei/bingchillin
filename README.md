@@ -20,6 +20,8 @@ Just writing this for fun in C with raylib for rendering.
 |End        |Cursor to line end            |
 |Ctrl Home  |Cursor to file beginning      |
 |Ctrl End   |Cursor to file end            |
+|PageUp     |Cursor moves 10 lines up      |
+|PageDown   |Cursor moves 10 lines down    |
 
 ## TODO
 
