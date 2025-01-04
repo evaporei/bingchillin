@@ -24,3 +24,4 @@ Just writing this for fun in C with raylib for rendering.
 ## TODO
 
 - [ ] display line numbers
+- [ ] un-jankify the rendering (please.)

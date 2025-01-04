@@ -179,6 +179,18 @@ void editor_cursor_to_last_line(Editor *e)
     e->cx = lastLine.end;
 }
 
+// returns if action was successfull or not
+bool editor_cursor_to_line_number(Editor *e, size_t lineNumber)
+{
+    // TODO: for now just move to line start, maybe it is the behaviour i want lol
+    if (lineNumber < 1 || lineNumber >= e->lines.count) return false;
+
+    size_t lineIndex = lineNumber - 1;
+    Line requiredLine = e->lines.items[lineIndex];
+    e->cx = requiredLine.start;
+    return true;
+}
+
 void editor_calculate_lines(Editor *e)
 {
     da_free(&e->lines);
@@ -322,7 +334,7 @@ void editor_load_file(Editor *e, const char *filename)
 
 void editor_save_file(Editor *e)
 {
-    printf("Saving to filename: %s", e->filename);
+    printf("Saving to filename: %s\n", e->filename);
     if (e->filename == NULL) return;
 
     // open file for writing
@@ -392,14 +404,28 @@ void update(Editor *e)
         else editor_cursor_to_line_end(e);
     }
 
-    if (IsKeyPressed(KEY_ENTER))
+    if(editor_key_pressed(KEY_PAGE_UP))
+    {
+        LOG("PageUp key pressed");
+        if (!editor_cursor_to_line_number(e, e->row+1 - 10))
+            editor_cursor_to_first_line(e);
+    }
+
+    if(editor_key_pressed(KEY_PAGE_DOWN))
+    {
+        LOG("PageDown key pressed");
+        if (!editor_cursor_to_line_number(e, e->row+1 + 10))
+            editor_cursor_to_last_line(e);
+    }
+
+    if (editor_key_pressed(KEY_ENTER))
     {
         LOG("Enter key pressed");
         editor_insert_char_at_cursor(e, '\n');
     }
 
     if (IsKeyPressed(KEY_TAB))
-    {
+    {   // TODO: implement proper tab behaviour
         LOG("Tab key pressed");
         for (int i=0; i<4; i++) editor_insert_char_at_cursor(e, ' ');
     }
