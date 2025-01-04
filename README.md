@@ -13,6 +13,8 @@ Just writing this for fun in C with raylib for rendering.
 |Ctrl -     |font size decrease            |
 |Right Arrow|Cursor right                  |
 |Left Arrow |Cursor left                   |
+|Up Arrow   |Cursor up                     |
+|Down Arrow |Cursor down                   |
 |Backspace  |remove character before cursor|
 |Delete     |remove character at cursor    |
 |Enter      |insert a newline              |
@@ -20,10 +22,13 @@ Just writing this for fun in C with raylib for rendering.
 |End        |Cursor to line end            |
 |Ctrl Home  |Cursor to file beginning      |
 |Ctrl End   |Cursor to file end            |
+|Ctrl Up    |Cursor to previous empty line |
+|Ctrl Down  |Cursor to next empty line     |
 |PageUp     |Cursor moves 10 lines up      |
 |PageDown   |Cursor moves 10 lines down    |
 
 ## TODO
 
+- [ ] proper cursor position calulation on font size change
 - [ ] display line numbers
 - [ ] un-jankify the rendering (please.)

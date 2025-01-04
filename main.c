@@ -191,6 +191,35 @@ bool editor_cursor_to_line_number(Editor *e, size_t lineNumber)
     return true;
 }
 
+void editor_cursor_to_next_empty_line(Editor *e)
+{
+    for (size_t i=e->row+1; i<e->lines.count; i++)
+    {
+        Line line = e->lines.items[i];
+        size_t lineSize = line.end - line.start;
+        if (lineSize == 0)
+        {
+            e->cx = line.start;
+            return;
+        }
+    }
+}
+
+void editor_cursor_to_prev_empty_line(Editor *e)
+{
+    if (e->row == 0 || e->row >= e->lines.count) return;
+    for (size_t i=e->row-1; i!=0; i--)
+    {
+        Line line = e->lines.items[i];
+        size_t lineSize = line.end - line.start;
+        if (lineSize == 0)
+        {
+            e->cx = line.start;
+            return;
+        }
+    }
+}
+
 void editor_calculate_lines(Editor *e)
 {
     da_free(&e->lines);
@@ -381,13 +410,15 @@ void update(Editor *e)
     if (editor_key_pressed(KEY_DOWN))
     {
         LOG("Cursor down");
-        editor_cursor_down(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_next_empty_line(e);
+        else editor_cursor_down(e);
     }
 
     if (editor_key_pressed(KEY_UP))
     {
         LOG("Cursor up");
-        editor_cursor_up(e);
+        if (IsKeyDown(KEY_LEFT_CONTROL)) editor_cursor_to_prev_empty_line(e);
+        else editor_cursor_up(e);
     }
 
     if (IsKeyPressed(KEY_HOME))
