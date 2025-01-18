@@ -15,6 +15,7 @@
 
 #define LOG(...) TraceLog(LOG_DEBUG, TextFormat(__VA_ARGS__))
 
+// TYPES
 typedef struct {
     size_t start;
     size_t end;
@@ -33,10 +34,17 @@ typedef struct {
 } Buffer;
 
 typedef struct {
-    size_t cx;
+    size_t pos; // cursor position in buffer
+
+    // for UI position
+    size_t row;
+    size_t col;
+} Cursor;
+
+typedef struct {
+    Cursor c;
     Buffer buffer;
     Lines  lines;
-    size_t row;
 
     int scrollX;
     int scrollY;
@@ -46,72 +54,84 @@ typedef struct {
     int fontSize;
     int charWidth;
     Font font;
+
+    int leftMargin;
 } Editor;
 
-size_t editor_get_cursor_row(Editor *e)
+size_t cursor_get_row(Cursor *c, Lines lines)
 {
-    assert(e->lines.count > 0);
-
-    for (size_t i=0; i<e->lines.count; i++)
+    assert(lines.count > 0);
+    for (size_t i=0; i<lines.count; i++)
     {
-        Line line = e->lines.items[i];
-        if (e->cx >= line.start && e->cx <= line.end)
+        Line line = lines.items[i];
+        if (c->pos >= line.start && c->pos <= line.end)
             return i;
     }
-    // return the last line/row
-    return e->lines.count - 1;
+    // HACK: might cause bugs later?
+    // - return last line as current row
+    //   if cursor isn't found in any line
+    return lines.count - 1;
+}
+
+size_t cursor_get_col(Cursor *c, Lines lines)
+{
+    Line currentLine = lines.items[c->row];
+    return c->pos - currentLine.start;
+}
+
+void cursor_update(Cursor *c, Lines lines)
+{
+    // find current row
+    c->row = cursor_get_row(c, lines);
+    
+    // find current col
+    c->col = cursor_get_col(c, lines);
 }
 
 void editor_cursor_right(Editor *e)
 {
     if (e->buffer.count == 0) return;
-    if (e->cx > e->buffer.count - 1) return;
-    e->cx++;
+    if (e->c.pos > e->buffer.count - 1) return;
+    e->c.pos++;
 }
 
 void editor_cursor_left(Editor *e)
 {
-    if (e->cx == 0) return;
-    e->cx--;
+    if (e->c.pos == 0) return;
+    e->c.pos--;
 }
 
 void editor_cursor_down(Editor *e)
 {
-    Line line = e->lines.items[e->row];
-    size_t col = e->cx - line.start;
+    if (e->c.row+1 > e->lines.count - 1) return;
 
-    if (e->row+1 > e->lines.count - 1) return;
-
-    Line nextLine = e->lines.items[e->row+1];
+    Line nextLine = e->lines.items[e->c.row+1];
     size_t nextLineSize = nextLine.end - nextLine.start;
 
-    if (nextLineSize >= col)
-        e->cx = nextLine.start + col;
+    if (nextLineSize >= e->c.col)
+        e->c.pos = nextLine.start + e->c.col;
     else
-        e->cx = nextLine.end;
+        e->c.pos = nextLine.end;
 }
 
 void editor_cursor_up(Editor *e)
 {
-    Line line = e->lines.items[e->row];
-    size_t col = e->cx - line.start;
+    if (e->c.row == 0) return;
 
-    if (e->row == 0) return;
-
-    Line prevLine = e->lines.items[e->row-1];
+    Line prevLine = e->lines.items[e->c.row-1];
     size_t prevLineSize = prevLine.end - prevLine.start;
 
-    if (prevLineSize >= col)
-        e->cx = prevLine.start + col;
+    if (prevLineSize >= e->c.col)
+        e->c.pos = prevLine.start + e->c.col;
     else
-        e->cx = prevLine.end;
+        e->c.pos = prevLine.end;
 }
 
 void editor_cursor_to_next_word(Editor *e)
 {
     bool foundWhitespace = false;
 
-    for (size_t i=e->cx; i<e->buffer.count; i++)
+    for (size_t i=e->c.pos; i<e->buffer.count; i++)
     {
         const char c = e->buffer.items[i];
         const bool checkWhitespace = c==' ' || c=='\n';
@@ -122,20 +142,20 @@ void editor_cursor_to_next_word(Editor *e)
         // check if char is whitespace
         if (foundWhitespace && ( !checkWhitespace || c=='\n' ))
         {
-            e->cx = i;
+            e->c.pos = i;
             return;
         }
     }
     // if no next word found
-    const Line line = e->lines.items[e->row];
-    e->cx = line.end;
+    const Line line = e->lines.items[e->c.row];
+    e->c.pos = line.end;
 }
 
 void editor_cursor_to_prev_word(Editor *e)
 {
     bool foundWhitespace = false;
     
-    for (size_t i=e->cx; i!=0; i--)
+    for (size_t i=e->c.pos; i!=0; i--)
     {
         const char c = e->buffer.items[i-1];
         const bool checkWhitespace = c==' ' || c=='\n';
@@ -146,37 +166,37 @@ void editor_cursor_to_prev_word(Editor *e)
         // check if char is whitespace
         if (foundWhitespace && ( !checkWhitespace || c=='\n' ))
         {
-            e->cx = i;
+            e->c.pos = i;
             return;
         }
     }
     // no prev word found
-    const Line line = e->lines.items[e->row];
-    e->cx = line.start;
+    const Line line = e->lines.items[e->c.row];
+    e->c.pos = line.start;
 }
 
 void editor_cursor_to_line_start(Editor *e)
 {
-    Line line = e->lines.items[e->row];
-    e->cx = line.start;
+    Line line = e->lines.items[e->c.row];
+    e->c.pos = line.start;
 }
 
 void editor_cursor_to_line_end(Editor *e)
 {
-    Line line = e->lines.items[e->row];
-    e->cx = line.end;
+    Line line = e->lines.items[e->c.row];
+    e->c.pos = line.end;
 }
 
 void editor_cursor_to_first_line(Editor *e)
 {
     Line firstLine = e->lines.items[0];
-    e->cx = firstLine.start;
+    e->c.pos = firstLine.start;
 }
 
 void editor_cursor_to_last_line(Editor *e)
 {
     Line lastLine = e->lines.items[e->lines.count - 1];
-    e->cx = lastLine.end;
+    e->c.pos = lastLine.end;
 }
 
 // returns if action was successfull or not
@@ -187,19 +207,19 @@ bool editor_cursor_to_line_number(Editor *e, size_t lineNumber)
 
     size_t lineIndex = lineNumber - 1;
     Line requiredLine = e->lines.items[lineIndex];
-    e->cx = requiredLine.start;
+    e->c.pos = requiredLine.start;
     return true;
 }
 
 void editor_cursor_to_next_empty_line(Editor *e)
 {
-    for (size_t i=e->row+1; i<e->lines.count; i++)
+    for (size_t i=e->c.row+1; i<e->lines.count; i++)
     {
         Line line = e->lines.items[i];
         size_t lineSize = line.end - line.start;
         if (lineSize == 0)
         {
-            e->cx = line.start;
+            e->c.pos = line.start;
             return;
         }
     }
@@ -207,14 +227,14 @@ void editor_cursor_to_next_empty_line(Editor *e)
 
 void editor_cursor_to_prev_empty_line(Editor *e)
 {
-    if (e->row == 0 || e->row >= e->lines.count) return;
-    for (size_t i=e->row-1; i!=0; i--)
+    if (e->c.row == 0 || e->c.row >= e->lines.count) return;
+    for (size_t i=e->c.row-1; i!=0; i--)
     {
         Line line = e->lines.items[i];
         size_t lineSize = line.end - line.start;
         if (lineSize == 0)
         {
-            e->cx = line.start;
+            e->c.pos = line.start;
             return;
         }
     }
@@ -247,13 +267,11 @@ void editor_calculate_lines(Editor *e)
 // Initialize Editor struct
 void editor_init(Editor *e)
 {
-    e->cx = 0;
+    e->c = (Cursor) {0};
     e->buffer = (Buffer) {0};
     da_init(&e->buffer);
     e->lines = (Lines) {0};
     da_init(&e->lines);
-
-    e->row = 0;
 
     e->scrollX = 0;
     e->scrollY = 0;
@@ -267,7 +285,7 @@ void editor_init(Editor *e)
 #endif
     e->fontSize = e->font.baseSize;
     e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
-
+    SetTextLineSpacing(e->fontSize);
     editor_calculate_lines(e); // NOTE: running this once results in there
                                // being atleast one `Line`
 }
@@ -285,31 +303,31 @@ void editor_insert_char_at_cursor(Editor *e, char c)
 {
     da_append(&e->buffer, '\0'); // increases count by one
     // move memory from cursor to end right by one
-    char *src = e->buffer.items + e->cx;
+    char *src = e->buffer.items + e->c.pos;
     char *dest = src + 1;
-    size_t len = e->buffer.count - 1 - e->cx;
+    size_t len = e->buffer.count - 1 - e->c.pos;
 
     memmove(dest, src, len);
     // set the char on cursor pos
-    e->buffer.items[e->cx] = c;
+    e->buffer.items[e->c.pos] = c;
 
     // move cursor right by one character
-    e->cx++;
+    e->c.pos++;
 
     editor_calculate_lines(e);
 }
 
 void editor_remove_char_before_cursor(Editor *e)
 {
-    if (e->cx == 0) return;
+    if (e->c.pos == 0) return;
 
-    char *src = e->buffer.items + e->cx;
-    char *dest = e->buffer.items + e->cx - 1;
-    size_t len = e->buffer.count - e->cx;
+    char *src = e->buffer.items + e->c.pos;
+    char *dest = e->buffer.items + e->c.pos - 1;
+    size_t len = e->buffer.count - e->c.pos;
     memmove(dest, src, len);
     
     // set cursor position & buffer count
-    e->cx--;
+    e->c.pos--;
     e->buffer.count--;
 
     editor_calculate_lines(e);
@@ -318,11 +336,11 @@ void editor_remove_char_before_cursor(Editor *e)
 void editor_remove_char_at_cursor(Editor *e)
 {
     if (e->buffer.count == 0) return;
-    if (e->cx > e->buffer.count - 1) return;
+    if (e->c.pos > e->buffer.count - 1) return;
 
-    char *src = e->buffer.items + e->cx + 1;
-    char *dest = e->buffer.items + e->cx;
-    size_t len = e->buffer.count - (e->cx + 1);
+    char *src = e->buffer.items + e->c.pos + 1;
+    char *dest = e->buffer.items + e->c.pos;
+    size_t len = e->buffer.count - (e->c.pos + 1);
     memmove(dest, src, len);
 
     e->buffer.count--;
@@ -438,14 +456,14 @@ void update(Editor *e)
     if(editor_key_pressed(KEY_PAGE_UP))
     {
         LOG("PageUp key pressed");
-        if (!editor_cursor_to_line_number(e, e->row+1 - 10))
+        if (!editor_cursor_to_line_number(e, e->c.row+1 - 10))
             editor_cursor_to_first_line(e);
     }
 
     if(editor_key_pressed(KEY_PAGE_DOWN))
     {
         LOG("PageDown key pressed");
-        if (!editor_cursor_to_line_number(e, e->row+1 + 10))
+        if (!editor_cursor_to_line_number(e, e->c.row+1 + 10))
             editor_cursor_to_last_line(e);
     }
 
@@ -482,30 +500,32 @@ void update(Editor *e)
     
     
     { // Update Editor members
-        e->row = editor_get_cursor_row(e);
+        cursor_update(&e->c, e->lines);
+
         e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
+        // TODO: do i need to update e->charWidth every frame?
+        // or only when the font size changes
     }
 
     { // update editor scroll offset
-      // NOTE: do not use old e->row
+      // NOTE: do not use old e->c.row
+      // - update it first
 
         const int winWidth = GetScreenWidth();
         const int winHeight = GetScreenHeight();
 
         // X offset calculation
-        const Line line = e->lines.items[e->row]; 
-        const int col = e->cx - line.start;
-        const int cursorX = col * e->charWidth;
+        const int cursorX = e->c.col * e->charWidth + e->leftMargin;
         const int winRight = winWidth - e->scrollX;
-        const int winLeft = 0 - e->scrollX;
+        const int winLeft = 0 - e->scrollX + e->leftMargin;
 
         if ( cursorX > winRight )
             e->scrollX = winWidth-cursorX-1;
         else if ( cursorX < winLeft )
-            e->scrollX = -cursorX;
+            e->scrollX = -cursorX + e->leftMargin;
 
         // Y offset calulation
-        const int cursorTop = e->row* e->fontSize;
+        const int cursorTop = e->c.row* e->fontSize;
         const int cursorBottom = cursorTop + e->fontSize;
         const int winBottom = winHeight - e->scrollY;
         const int winTop = 0 - e->scrollY;
@@ -522,34 +542,44 @@ void draw(Editor *e)
         BeginDrawing();
         ClearBackground(BLACK);
 
-        { // Rendering text from buffer
+        { // Render Text Buffer
+            // null terminate buffer before drawing it
+            da_append(&e->buffer, '\0');
+
+            Vector2 pos = {
+                e->leftMargin+e->scrollX, 
+                0+e->scrollY,
+            };
+            DrawTextEx(e->font, e->buffer.items, pos, e->fontSize, 0, GREEN);
+            // remove \0
+            da_remove(&e->buffer);
+        }
+
+        { // Render line numbers
+            // blank box under line numbers
+            DrawRectangle(0, 0, e->leftMargin, GetScreenHeight(), BLACK);
+
+            // the line numbers
+            const char *strLineNum;
             for (size_t i=0; i<e->lines.count; i++)
             {
-                Line line = e->lines.items[i];
-
-                const char* lineStart = e->buffer.items + line.start;
-                const size_t lineSize = line.end - line.start;
-                char *text = malloc(lineSize + 1);
-                memcpy(text, lineStart, lineSize);
-                text[lineSize] = '\0';
-                Vector2 pos = (Vector2) {
-                    0+e->scrollX,
+                strLineNum = TextFormat("%lu", i+1);
+                Vector2 pos = {
+                    0,
                     (int)(e->fontSize*i) + e->scrollY,
                     // NOTE: i being size_t causes HUGE(obviously) underflow on line 0 when scrollY < 0
                     // -  solution cast to (int): may cause issue later (pain) :( 
                 };
-
-                DrawTextEx( e->font, text, pos, e->fontSize, 0, GREEN);
-                free(text);
+                DrawTextEx(e->font, strLineNum, pos, e->fontSize, 0, GREEN);
             }
+            e->leftMargin = strlen(strLineNum) + 2;
+            e->leftMargin *= e->charWidth;
         }
-        
-        { // Rendering cursor (atleast trying to)
-            Line line = e->lines.items[e->row];
-            size_t col = e->cx - line.start;
 
-            int cursorX = col * e->charWidth + e->scrollX;
-            int cursorY = e->row * e->fontSize + e->scrollY;
+        { // Rendering cursor (atleast trying to)
+
+            int cursorX = e->c.col * e->charWidth + e->scrollX + e->leftMargin;
+            int cursorY = e->c.row * e->fontSize + e->scrollY;
 
             DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + e->fontSize, PINK);
         }
@@ -565,7 +595,7 @@ int main(int argc, char **argv)
     SetTraceLogLevel(LOG_DEBUG);
 #endif
     InitWindow(800, 600, "the bingchillin text editor");
-    SetWindowState(FLAG_WINDOW_RESIZABLE); // NOTE: not fully tested with resizing enabled
+    SetWindowState(FLAG_WINDOW_RESIZABLE); // HACK: not fully tested with resizing enabled
                                            // might cause some bugs
     SetTargetFPS(60);
 

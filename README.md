@@ -29,6 +29,8 @@ Just writing this for fun in C with raylib for rendering.
 
 ## TODO
 
+- [x] display line numbers
+- [ ] maybe append a `\n` at the then when saving?
 - [ ] proper cursor position calulation on font size change
-- [ ] display line numbers
 - [ ] un-jankify the rendering (please.)
+- [ ] implement text selection and basic selection operations

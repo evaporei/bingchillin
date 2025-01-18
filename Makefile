@@ -4,7 +4,7 @@ SRCS := main.c
 
 CC := gcc
 INCFLAGS := -Iinclude
-CFLAGS := -Wall -Wextra -ggdb $(INCFLAGS)
+CFLAGS := -Wall -Wextra -ggdb $(INCFLAGS) -fsanitize=address
 LDFLAGS := -Llib -lraylib -lm
 
 $(TARGET): $(SRCS)
