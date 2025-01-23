@@ -6,6 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Configuration requested by Abdullah Rashid 🗿 //
+#define CURSOR_COLOR    PINK
+#define TEXT_COLOR      GREEN
+#define BG_COLOR        BLACK
+#define UI_COLOR        TEXT_COLOR
+
 #ifdef BUILD_RELEASE
 #include "build/font.h"
 #endif
@@ -39,6 +45,8 @@ typedef struct {
     // for UI position
     size_t row;
     size_t col;
+    int x;
+    int y;
 } Cursor;
 
 typedef struct {
@@ -79,13 +87,36 @@ size_t cursor_get_col(Cursor *c, Lines lines)
     return c->pos - currentLine.start;
 }
 
-void cursor_update(Cursor *c, Lines lines)
+void editor_cursor_update(Editor *e)
 {
     // find current row
-    c->row = cursor_get_row(c, lines);
+    e->c.row = cursor_get_row(&e->c, e->lines);
     
     // find current col
-    c->col = cursor_get_col(c, lines);
+    e->c.col = cursor_get_col(&e->c, e->lines);
+
+    // calculate cursor X and Y position on screen
+    // Y position
+    e->c.y = e->c.row * e->fontSize;
+
+    // X position
+    // measure the text from line start upto cursor position
+    const Line currentLine = e->lines.items[e->c.row];
+    const int requiredSize = e->c.pos - currentLine.start;
+
+    char *textBeforeCursor = malloc(sizeof(char) * requiredSize + 1);
+    // copy text from line start to cursor pos
+    strncpy(textBeforeCursor, &e->buffer.items[currentLine.start], requiredSize);
+    textBeforeCursor[requiredSize] = '\0'; // null terminate it niggesh
+
+    if (requiredSize > 0)
+        e->c.x = MeasureTextEx(e->font, textBeforeCursor, e->fontSize, 0).x;
+    else
+        e->c.x = 0;
+
+    e->c.x += e->leftMargin;
+
+    free(textBeforeCursor);
 }
 
 void editor_cursor_right(Editor *e)
@@ -223,6 +254,10 @@ void editor_cursor_to_next_empty_line(Editor *e)
             return;
         }
     }
+    // move to last line if no next empty line found
+    Line lastLine = e->lines.items[e->lines.count - 1];
+    e->c.pos = lastLine.start;
+    return;
 }
 
 void editor_cursor_to_prev_empty_line(Editor *e)
@@ -238,6 +273,10 @@ void editor_cursor_to_prev_empty_line(Editor *e)
             return;
         }
     }
+    // move to first line if no previous empty line found
+    Line firstLine = e->lines.items[0];
+    e->c.pos = firstLine.start;
+    return;
 }
 
 void editor_calculate_lines(Editor *e)
@@ -286,6 +325,8 @@ void editor_init(Editor *e)
     e->fontSize = e->font.baseSize;
     e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
     SetTextLineSpacing(e->fontSize);
+
+    e->leftMargin = 0;
     editor_calculate_lines(e); // NOTE: running this once results in there
                                // being atleast one `Line`
 }
@@ -348,6 +389,13 @@ void editor_remove_char_at_cursor(Editor *e)
     editor_calculate_lines(e);
 }
 
+void editor_set_font_size(Editor *e, int newFontSize)
+{
+    if (newFontSize <= 0) return;
+    e->fontSize = newFontSize;
+    SetTextLineSpacing(e->fontSize);
+}
+
 void editor_load_file(Editor *e, const char *filename)
 {
     LOG("Opening file: %s", filename);
@@ -406,8 +454,12 @@ void update(Editor *e)
 {
     if (IsKeyDown(KEY_LEFT_CONTROL))
     {
-        if (editor_key_pressed(KEY_EQUAL)) e->fontSize++;
-        if (editor_key_pressed(KEY_MINUS)) e->fontSize--;
+        if (editor_key_pressed(KEY_EQUAL))
+            editor_set_font_size(e, e->fontSize + 1);
+
+        if (editor_key_pressed(KEY_MINUS))
+            editor_set_font_size(e, e->fontSize - 1);
+
         if (IsKeyPressed(KEY_S)) editor_save_file(e);
     }
 
@@ -500,7 +552,7 @@ void update(Editor *e)
     
     
     { // Update Editor members
-        cursor_update(&e->c, e->lines);
+        editor_cursor_update(e);
 
         e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
         // TODO: do i need to update e->charWidth every frame?
@@ -509,13 +561,14 @@ void update(Editor *e)
 
     { // update editor scroll offset
       // NOTE: do not use old e->c.row
-      // - update it first
+      // - update it first `the cursor_update() function`
 
         const int winWidth = GetScreenWidth();
         const int winHeight = GetScreenHeight();
 
         // X offset calculation
-        const int cursorX = e->c.col * e->charWidth + e->leftMargin;
+        /*const int cursorX = e->c.col * e->charWidth + e->leftMargin;*/
+        const int cursorX = e->c.x;
         const int winRight = winWidth - e->scrollX;
         const int winLeft = 0 - e->scrollX + e->leftMargin;
 
@@ -525,7 +578,7 @@ void update(Editor *e)
             e->scrollX = -cursorX + e->leftMargin;
 
         // Y offset calulation
-        const int cursorTop = e->c.row* e->fontSize;
+        const int cursorTop = e->c.y;
         const int cursorBottom = cursorTop + e->fontSize;
         const int winBottom = winHeight - e->scrollY;
         const int winTop = 0 - e->scrollY;
@@ -540,7 +593,7 @@ void update(Editor *e)
 void draw(Editor *e)
 {
         BeginDrawing();
-        ClearBackground(BLACK);
+        ClearBackground(BG_COLOR);
 
         { // Render Text Buffer
             // null terminate buffer before drawing it
@@ -550,15 +603,18 @@ void draw(Editor *e)
                 e->leftMargin+e->scrollX, 
                 0+e->scrollY,
             };
-            DrawTextEx(e->font, e->buffer.items, pos, e->fontSize, 0, GREEN);
+            DrawTextEx(e->font, e->buffer.items, pos, e->fontSize, 0, TEXT_COLOR);
             // remove \0
             da_remove(&e->buffer);
         }
 
         { // Render line numbers
             // blank box under line numbers
-            DrawRectangle(0, 0, e->leftMargin, GetScreenHeight(), BLACK);
+            DrawRectangle(0, 0, e->leftMargin, GetScreenHeight(), BG_COLOR);
 
+            // draw vertical line seperating the line nums
+            DrawLine(e->leftMargin-1, 0, e->leftMargin-1, GetScreenHeight(), UI_COLOR);
+            
             // the line numbers
             const char *strLineNum;
             for (size_t i=0; i<e->lines.count; i++)
@@ -570,18 +626,15 @@ void draw(Editor *e)
                     // NOTE: i being size_t causes HUGE(obviously) underflow on line 0 when scrollY < 0
                     // -  solution cast to (int): may cause issue later (pain) :( 
                 };
-                DrawTextEx(e->font, strLineNum, pos, e->fontSize, 0, GREEN);
+                DrawTextEx(e->font, strLineNum, pos, e->fontSize, 0, UI_COLOR);
+
             }
             e->leftMargin = strlen(strLineNum) + 2;
             e->leftMargin *= e->charWidth;
         }
 
         { // Rendering cursor (atleast trying to)
-
-            int cursorX = e->c.col * e->charWidth + e->scrollX + e->leftMargin;
-            int cursorY = e->c.row * e->fontSize + e->scrollY;
-
-            DrawLine(cursorX+1, cursorY, cursorX+1, cursorY + e->fontSize, PINK);
+            DrawLine(e->c.x + e->scrollX + 1, e->c.y + e->scrollY, e->c.x + e->scrollX + 1, e->c.y + e->scrollY + e->fontSize, CURSOR_COLOR);
         }
 
         EndDrawing();
