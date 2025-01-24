@@ -26,7 +26,7 @@ Just writing this for fun in C with raylib for rendering.
 |Ctrl Down       |Cursor to next empty line      |
 |PageUp          |Cursor moves 10 lines up       |
 |PageDown        |Cursor moves 10 lines down     |
-|Shift <movement>|Select stuff on cursor movement|
+|Shift [movement]|Select stuff on cursor movement|
 
 ## TODO
 
