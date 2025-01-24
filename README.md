@@ -27,6 +27,8 @@ Just writing this for fun in C with raylib for rendering.
 |PageUp          |Cursor moves 10 lines up       |
 |PageDown        |Cursor moves 10 lines down     |
 |Shift [movement]|Select stuff on cursor movement|
+|Backspace/Delete|Deletes selection              |
+|Escape          |Clears selection               |
 
 ## TODO
 
