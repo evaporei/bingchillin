@@ -449,6 +449,22 @@ void editor_selection_delete(Editor *e)
     editor_calculate_lines(e);
 }
 
+void editor_remove_word_before_cursor(Editor *e)
+{
+    int startingPos = e->c.pos;
+    editor_cursor_to_prev_word(e);
+    editor_select(e, startingPos);
+    editor_selection_delete(e);
+}
+
+void editor_remove_word_after_cursor(Editor *e)
+{
+    int startingPos = e->c.pos;
+    editor_cursor_to_next_word(e);
+    editor_select(e, startingPos);
+    editor_selection_delete(e);
+}
+
 void editor_set_font_size(Editor *e, int newFontSize)
 {
     if (newFontSize <= 0) return;
@@ -607,6 +623,7 @@ void update(Editor *e)
     if (editor_key_pressed(KEY_ENTER))
     {
         LOG("Enter key pressed");
+        if (e->selection.exists) editor_selection_delete(e);
         editor_insert_char_at_cursor(e, '\n');
     }
 
@@ -623,6 +640,8 @@ void update(Editor *e)
         LOG("Backspace pressed");
         if (e->selection.exists)
             editor_selection_delete(e);
+        else if (IsKeyDown(KEY_LEFT_CONTROL))
+            editor_remove_word_before_cursor(e);
         else
             editor_remove_char_before_cursor(e);
     }
@@ -632,6 +651,8 @@ void update(Editor *e)
         LOG("Delete pressed");
         if (e->selection.exists)
             editor_selection_delete(e);
+        else if (IsKeyDown(KEY_LEFT_CONTROL))
+            editor_remove_word_after_cursor(e);
         else
             editor_remove_char_at_cursor(e);
     }
@@ -639,6 +660,7 @@ void update(Editor *e)
     char key = GetCharPressed();
     if (key) {
         LOG("%c - character pressed", key);
+        if (e->selection.exists) editor_selection_delete(e);
         editor_insert_char_at_cursor(e, key);
     }
     

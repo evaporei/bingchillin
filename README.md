@@ -17,6 +17,8 @@ Just writing this for fun in C with raylib for rendering.
 |Down Arrow      |Cursor down                    |
 |Backspace       |remove character before cursor |
 |Delete          |remove character at cursor     |
+|Ctrl Backspace  |remove word before cursor      |
+|Ctrl Delete     |remove word after cursor       |
 |Enter           |insert a newline               |
 |Home            |Cursor to line beginning       |
 |End             |Cursor to line end             |
