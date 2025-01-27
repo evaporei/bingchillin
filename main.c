@@ -14,11 +14,12 @@
 #define LOG(...) TraceLog(LOG_DEBUG, TextFormat(__VA_ARGS__))
 
 // Configuration requested by Abdullah Rashid -_- //
-#define TEXT_COLOR      GREEN
-#define UI_COLOR        TEXT_COLOR
-#define BG_COLOR        BLACK
-#define CURSOR_COLOR    PINK
-#define SELECTION_COLOR YELLOW
+#define TEXT_COLOR       GREEN
+#define UI_COLOR         TEXT_COLOR
+#define BG_COLOR         BLACK
+#define CURSOR_COLOR     PINK
+#define SELECTION_COLOR  YELLOW
+#define DEFAULT_FONTSIZE 30
 
 // TYPES
 typedef struct {
@@ -329,7 +330,7 @@ void editor_init(Editor *e)
 #else
     e->font = LoadFont("monogram.ttf");
 #endif
-    e->fontSize = e->font.baseSize;
+    e->fontSize = DEFAULT_FONTSIZE;
     e->fontSpacing = 0;
     SetTextLineSpacing(e->fontSize);
 
@@ -474,13 +475,16 @@ void editor_set_font_size(Editor *e, int newFontSize)
 void editor_load_file(Editor *e, const char *filename)
 {
     LOG("Opening file: %s", filename);
+    e->filename = filename;
+    SetWindowTitle(TextFormat("%s | the bingchillin text editor", e->filename));
 
     // get size of the file
     FILE *f = fopen(filename, "r");
     if (f == NULL)
     {
         perror("Error opening file");
-        exit(1);
+        //exit(1);
+        return;
     }
 
     fseek(f, 0L, SEEK_END);
@@ -498,7 +502,6 @@ void editor_load_file(Editor *e, const char *filename)
     // remember to close file
     fclose(f);
 
-    e->filename = filename;
     editor_calculate_lines(e);
 }
 
@@ -530,7 +533,7 @@ void editor_draw_text(Editor *e, const char* text, Vector2 pos, Color color)
     DrawTextEx(e->font, text, pos, e->fontSize, e->fontSpacing, color);
 }
 
-void update(Editor *e)
+bool update(Editor *e)
 {
     if (IsKeyDown(KEY_LEFT_CONTROL))
     {
@@ -541,7 +544,7 @@ void update(Editor *e)
             editor_set_font_size(e, e->fontSize - 1);
 
         if (IsKeyPressed(KEY_S)) editor_save_file(e);
-        if (IsKeyPressed(KEY_Q)) exit(69); // TODO: lol add proper exiting
+        if (IsKeyPressed(KEY_Q)) return true;
     }
 
     // -------------------
@@ -695,6 +698,7 @@ void update(Editor *e)
         else if (cursorTop < winTop)
             e->scrollY = -cursorTop;
     }
+    return 0;
 }
 
 void draw(Editor *e)
@@ -825,9 +829,10 @@ int main(int argc, char **argv)
         editor_load_file(&editor, argv[1]);
     }
     
-    while(!WindowShouldClose())
+    bool shouldQuit = false;
+    while(!WindowShouldClose() && !shouldQuit)
     {
-        update(&editor);
+        shouldQuit = update(&editor);
         draw(&editor);
     }
 
