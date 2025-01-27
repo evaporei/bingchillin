@@ -67,7 +67,6 @@ typedef struct {
 
     int fontSize;
     int fontSpacing;
-    int charWidth;
     Font font;
 
     int leftMargin;
@@ -94,6 +93,19 @@ size_t cursor_get_col(Cursor *c, Lines lines)
     return c->pos - currentLine.start;
 }
 
+int editor_measure_text(Editor *e, const char *textStart, int n)
+{
+    int width = 0;
+    char *textToMeasure = malloc(sizeof(char) * (n + 1));
+    strncpy(textToMeasure, textStart, n);
+    textToMeasure[n] = '\0'; // null terminating it so MeasureText..() can detect the end
+    if (n > 0)
+        width = (int) MeasureTextEx(e->font, textToMeasure, e->fontSize, e->fontSpacing).x;
+
+    free(textToMeasure);
+    return width;
+}
+
 void editor_cursor_update(Editor *e)
 {
     // find current row
@@ -111,19 +123,7 @@ void editor_cursor_update(Editor *e)
     const Line currentLine = e->lines.items[e->c.row];
     const int requiredSize = e->c.pos - currentLine.start;
 
-    char *textBeforeCursor = malloc(sizeof(char) * requiredSize + 1);
-    // copy text from line start to cursor pos
-    strncpy(textBeforeCursor, &e->buffer.items[currentLine.start], requiredSize);
-    textBeforeCursor[requiredSize] = '\0'; // null terminate it niggesh
-
-    if (requiredSize > 0)
-        e->c.x = MeasureTextEx(e->font, textBeforeCursor, e->fontSize, 0).x;
-    else
-        e->c.x = 0;
-
-    e->c.x += e->leftMargin;
-
-    free(textBeforeCursor);
+    e->c.x = editor_measure_text(e, &e->buffer.items[currentLine.start], requiredSize) + e->leftMargin;
 }
 
 void editor_cursor_right(Editor *e)
@@ -331,7 +331,6 @@ void editor_init(Editor *e)
 #endif
     e->fontSize = e->font.baseSize;
     e->fontSpacing = 0;
-    e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
     SetTextLineSpacing(e->fontSize);
 
     e->leftMargin = 0;
@@ -666,10 +665,6 @@ void update(Editor *e)
     
     { // Update Editor members
         editor_cursor_update(e);
-
-        e->charWidth = MeasureTextEx(e->font, "a", e->fontSize, 0).x;
-        // TODO: do i need to update e->charWidth every frame?
-        // or only when the font size changes
     }
 
     { // update editor scroll offset
@@ -680,7 +675,6 @@ void update(Editor *e)
         const int winHeight = GetScreenHeight();
 
         // X offset calculation
-        /*const int cursorX = e->c.col * e->charWidth + e->leftMargin;*/
         const int cursorX = e->c.x;
         const int winRight = winWidth - e->scrollX;
         const int winLeft = 0 - e->scrollX + e->leftMargin;
@@ -743,7 +737,7 @@ void draw(Editor *e)
 
                     Rectangle rect = {
                         .height = e->fontSize,
-                        .width = (line.end - line.start) * e->charWidth,
+                        .width = editor_measure_text(e, &e->buffer.items[line.start], line.end - line.start),
                         .x = 0,
                         .y = (int)i * e->fontSize,
                     };
@@ -751,7 +745,8 @@ void draw(Editor *e)
                     if (start >= line.start && start <= line.end)
                     {
                         startInLine = selectionFound = true;
-                        rect.x = abs((int)(line.start - start)) * e->charWidth;
+                        int chars = abs((int)line.start - (int)start);
+                        rect.x = editor_measure_text(e, &e->buffer.items[line.start], chars);
                         rect.width = rect.width - rect.x;
                     }
 
@@ -759,11 +754,11 @@ void draw(Editor *e)
                     {
                         if (startInLine) {
                             int chars = end - start;
-                            rect.width = chars * e->charWidth;
+                            rect.width = editor_measure_text(e, &e->buffer.items[start], chars);
                         }
                         else {
-                            int chars = abs((int)line.start - end);
-                            rect.width = chars * e->charWidth;
+                            int chars = abs((int)line.start - (int)end);
+                            rect.width = editor_measure_text(e, &e->buffer.items[line.start], chars);
                         }
                     }
 
@@ -799,10 +794,10 @@ void draw(Editor *e)
                 editor_draw_text(e, strLineNum, pos, UI_COLOR);
             }
             e->leftMargin = strlen(strLineNum) + 2;
-            e->leftMargin *= e->charWidth;
+            e->leftMargin *= editor_measure_text(e, "a", 1);
         }
 
-        { // Rendering cursor (atleast trying to)
+        { // Render cursor (atleast trying to)
             DrawLine(e->c.x + e->scrollX + 1, e->c.y + e->scrollY, e->c.x + e->scrollX + 1, e->c.y + e->scrollY + e->fontSize, CURSOR_COLOR);
         }
 

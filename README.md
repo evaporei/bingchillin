@@ -28,7 +28,7 @@ Just writing this for fun in C with raylib for rendering.
 |Ctrl Down       |Cursor to next empty line      |
 |PageUp          |Cursor moves 10 lines up       |
 |PageDown        |Cursor moves 10 lines down     |
-|Shift [movement]|Select stuff on cursor movement|
+|Shift \[movement]|Select stuff on cursor movement|
 |Backspace/Delete|Deletes selection              |
 |Escape          |Clears selection               |
 
@@ -36,9 +36,12 @@ Just writing this for fun in C with raylib for rendering.
 
 - [x] display line numbers
 - [x] proper cursor position calulation on font size change
-- [x] un-jankify the rendering (please.)  
-    - done....?
+- [x] un-jankify the rendering (please.)
+  - done....?
 - [x] implement text selection and basic selection operations
-    - very rudimentary selection with much bugs
-- [ ] refine selection stuff
-- [ ] maybe append a `\n` at the then when saving?
+  - very rudimentary selection with much bugs
+- [x] refine selection stuff - proper width and position calculation for font size change
+- [ ] maybe append a `\\n` at the then when saving?
+- [ ] better file handling
+  - creating new file when given file doesnt exist
+- [ ] notification system for giving user feedback (e.g. Saved to filename *XYZ*)
