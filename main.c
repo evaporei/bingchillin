@@ -56,6 +56,15 @@ typedef struct {
 } Cursor;
 
 typedef struct {
+    //bool        enabled;
+    char*  items; // message string
+    size_t size;
+    size_t count;
+
+    double timer;
+} Notification;
+
+typedef struct {
     Cursor c;
     Buffer buffer;
     Lines  lines;
@@ -66,12 +75,29 @@ typedef struct {
     
     const char * filename;
 
+    Notification notif;
+
     int fontSize;
     int fontSpacing;
     Font font;
 
     int leftMargin;
 } Editor;
+
+void notification_update(Notification *n)
+{
+    if (n->timer <= 0) 
+        return;
+    n->timer -= GetFrameTime();
+}
+
+void notification_issue(Notification *n, const char* message, double timeout)
+{
+    da_reserve(n, strlen(message)+1);
+    strcpy(n->items, message);
+
+    n->timer = timeout;
+}
 
 size_t cursor_get_row(Cursor *c, Lines lines)
 {
@@ -104,6 +130,12 @@ int editor_measure_text(Editor *e, const char *textStart, int n)
         width = (int) MeasureTextEx(e->font, textToMeasure, e->fontSize, e->fontSpacing).x;
 
     free(textToMeasure);
+    return width;
+}
+
+int editor_measure_str(Editor *e, const char *str)
+{
+    int width = MeasureTextEx(e->font, str, e->fontSize, e->fontSpacing).x;
     return width;
 }
 
@@ -325,6 +357,9 @@ void editor_init(Editor *e)
     
     e->filename = NULL;
 
+    e->notif = (Notification) {0};
+    da_init(&e->notif);
+
 #ifdef BUILD_RELEASE
     e->font = LoadFont_Font();
 #else
@@ -343,6 +378,7 @@ void editor_deinit(Editor *e)
 {
     da_free(&e->buffer);
     da_free(&e->lines);
+    da_free(&e->notif);
 #ifndef BUILD_RELEASE
     UnloadFont(e->font);
 #endif
@@ -507,14 +543,15 @@ void editor_load_file(Editor *e, const char *filename)
 
 void editor_save_file(Editor *e)
 {
-    printf("Saving to filename: %s\n", e->filename);
+    notification_issue(&e->notif, TextFormat("Saving to file: %s", e->filename), 1);
+
     if (e->filename == NULL) return;
 
     // open file for writing
     FILE *f = fopen(e->filename, "w");
     if (f == NULL)
     {
-        perror("Error opening file");
+        perror("Cannot open file for saving");
         exit(1);
     }
     // write the buffer to the previously opened file
@@ -665,6 +702,8 @@ bool update(Editor *e)
         if (e->selection.exists) editor_selection_delete(e);
         editor_insert_char_at_cursor(e, key);
     }
+
+    notification_update(&e->notif);
     
     { // Update Editor members
         editor_cursor_update(e);
@@ -798,11 +837,28 @@ void draw(Editor *e)
                 editor_draw_text(e, strLineNum, pos, UI_COLOR);
             }
             e->leftMargin = strlen(strLineNum) + 2;
-            e->leftMargin *= editor_measure_text(e, "a", 1);
+            e->leftMargin *= editor_measure_str(e, "a");
         }
 
         { // Render cursor (atleast trying to)
             DrawLine(e->c.x + e->scrollX + 1, e->c.y + e->scrollY, e->c.x + e->scrollX + 1, e->c.y + e->scrollY + e->fontSize, CURSOR_COLOR);
+        }
+
+        // Render Notification
+        if (e->notif.timer > 0.0) {
+            int textW = editor_measure_str(e, e->notif.items);
+            int textH = e->fontSize;
+
+            Vector2 textPos = {
+                GetScreenWidth()/2.0f - (double)textW/2,
+                GetScreenHeight()/2.0f - (double)textH/2,
+            };
+            // render blank box
+            const int padding = 5;
+            DrawRectangle(textPos.x-padding, textPos.y-padding, textW+padding, textH+padding, BG_COLOR);
+            DrawRectangleLines(textPos.x-padding, textPos.y-padding, textW+padding, textH+padding, CURSOR_COLOR);
+            // render notification message
+            editor_draw_text(e, e->notif.items, textPos, CURSOR_COLOR);
         }
 
         EndDrawing();

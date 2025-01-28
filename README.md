@@ -42,5 +42,5 @@ Just writing this for fun in C with raylib for rendering.
   - very rudimentary selection with much bugs
 - [x] refine selection stuff - proper width and position calculation for font size change
 - [x] creating new file when given file doesnt exist
-- [ ] maybe append a `\\n` at the then when saving?
-- [ ] notification system for giving user feedback (e.g. Saved to filename *XYZ*)
+- [x] basic notification system for giving user feedback (e.g. Saved to filename *XYZ*)
+- [ ] when saving: append `\n` char to end of buffer if no `\n` exists as the last character
