@@ -855,8 +855,8 @@ void draw(Editor *e)
             };
             // render blank box
             const int padding = 5;
-            DrawRectangle(textPos.x-padding, textPos.y-padding, textW+padding, textH+padding, BG_COLOR);
-            DrawRectangleLines(textPos.x-padding, textPos.y-padding, textW+padding, textH+padding, CURSOR_COLOR);
+            DrawRectangle(textPos.x-padding, textPos.y-padding, textW+(padding*2), textH+(padding*2), BG_COLOR);
+            DrawRectangleLines(textPos.x-padding, textPos.y-padding, textW+(padding*2), textH+(padding*2), CURSOR_COLOR);
             // render notification message
             editor_draw_text(e, e->notif.items, textPos, CURSOR_COLOR);
         }
