@@ -49,5 +49,5 @@ Just writing this for fun in C with raylib for rendering.
 - [x] basic notification system for giving user feedback (e.g. Saved to filename *XYZ*
   )
 - [x] copy paste functionality
-- [ ] when saving: append `\\n` char to end of buffer if no `\\n` exists as the last
+- [ ] when saving: append `\n` char to end of buffer if no `\n` exists as the last
   character
