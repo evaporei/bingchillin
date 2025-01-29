@@ -485,6 +485,19 @@ void editor_selection_delete(Editor *e)
     editor_calculate_lines(e);
 }
 
+void editor_select_all(Editor *e)
+{
+    const Line firstLine = e->lines.items[0];
+    const Line lastLine  = e->lines.items[e->lines.count - 1];
+
+    e->selection = (Selection) {
+        .start = firstLine.start,
+        .end   = lastLine.end,
+        .exists = true,
+    };
+    LOG("Selected all");
+}
+
 void editor_remove_word_before_cursor(Editor *e)
 {
     int startingPos = e->c.pos;
@@ -501,11 +514,64 @@ void editor_remove_word_after_cursor(Editor *e)
     editor_selection_delete(e);
 }
 
+void editor_copy(Editor *e)
+{
+    //get selected text or current line
+    char *text = NULL;
+    if (e->selection.exists)
+    {
+        int start, end = 0;
+
+        if (e->selection.end > e->selection.start)
+        {
+            start = e->selection.start;
+            end = e->selection.end;
+        }
+        else
+        {
+            start = e->selection.end;
+            end = e->selection.start;
+        }
+
+        const int length = end - start;
+        text = malloc(sizeof(char) * (length + 1));
+        strncpy(text, &e->buffer.items[start], length);
+        text[length] = '\0';
+    }
+    else
+    {
+        Line currentLine = e->lines.items[e->c.row];
+        const int length = currentLine.end - currentLine.start;
+        text = malloc(sizeof(char) * (length + 1));
+        strncpy(text, &e->buffer.items[currentLine.start], length);
+        text[length] = '\0';
+    }
+
+    //put it into clipboard lol
+    SetClipboardText(text);
+    free(text);
+    LOG("Copied text");
+}
+
+void editor_paste(Editor *e)
+{
+    const char *text = GetClipboardText();
+
+    if (e->selection.exists) 
+        editor_selection_delete(e);
+
+    for (int i=0; i<strlen(text); i++)
+        editor_insert_char_at_cursor(e, text[i]);
+    // TODO: editor_insert_str_at_cursor() needed?
+    LOG("Pasted into editor");
+}
+
 void editor_set_font_size(Editor *e, int newFontSize)
 {
     if (newFontSize <= 0) return;
     e->fontSize = newFontSize;
     SetTextLineSpacing(e->fontSize);
+    LOG("font size changed to %d", e->fontSize);
 }
 
 void editor_load_file(Editor *e, const char *filename)
@@ -580,8 +646,13 @@ bool update(Editor *e)
         if (editor_key_pressed(KEY_MINUS))
             editor_set_font_size(e, e->fontSize - 1);
 
+        if (IsKeyPressed(KEY_A)) editor_select_all(e);
+
         if (IsKeyPressed(KEY_S)) editor_save_file(e);
         if (IsKeyPressed(KEY_Q)) return true;
+
+        if (IsKeyPressed(KEY_C)) editor_copy(e);
+        if (editor_key_pressed(KEY_V)) editor_paste(e);
     }
 
     // -------------------
