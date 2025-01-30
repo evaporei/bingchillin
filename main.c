@@ -553,6 +553,23 @@ void editor_copy(Editor *e)
     LOG("Copied text");
 }
 
+void editor_cut(Editor *e)
+{
+    editor_copy(e);
+    if (e->selection.exists)
+        editor_selection_delete(e);
+    else
+    {   // delete current line
+        Line currentLine = e->lines.items[e->c.row];
+        e->selection = (Selection) {
+            .exists = true,
+            .start  = currentLine.start,
+            .end    = currentLine.end,
+        };
+        editor_selection_delete(e);
+    }
+}
+
 void editor_paste(Editor *e)
 {
     const char *text = GetClipboardText();
@@ -652,6 +669,7 @@ bool update(Editor *e)
         if (IsKeyPressed(KEY_Q)) return true;
 
         if (IsKeyPressed(KEY_C)) editor_copy(e);
+        if (IsKeyPressed(KEY_X)) editor_cut(e);
         if (editor_key_pressed(KEY_V)) editor_paste(e);
     }
 

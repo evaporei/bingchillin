@@ -7,33 +7,34 @@ Just writing this for fun in C with raylib for rendering.
 ## Controls
 
 
-|Key             |Action                         |
-|----------------|-------------------------------|
-|Ctrl =          |font size increase             |
-|Ctrl -          |font size decrease             |
-|Right Arrow     |Cursor right                   |
-|Left Arrow      |Cursor left                    |
-|Up Arrow        |Cursor up                      |
-|Down Arrow      |Cursor down                    |
-|Backspace       |remove character before cursor |
-|Delete          |remove character at cursor     |
-|Ctrl Backspace  |remove word before cursor      |
-|Ctrl Delete     |remove word after cursor       |
-|Enter           |insert a newline               |
-|Home            |Cursor to line beginning       |
-|End             |Cursor to line end             |
-|Ctrl Home       |Cursor to file beginning       |
-|Ctrl End        |Cursor to file end             |
-|Ctrl Up         |Cursor to previous empty line  |
-|Ctrl Down       |Cursor to next empty line      |
-|PageUp          |Cursor moves 10 lines up       |
-|PageDown        |Cursor moves 10 lines down     |
+|Key              |Action                         |
+|---------------- |-------------------------------|
+|Ctrl =           |font size increase             |
+|Ctrl -           |font size decrease             |
+|Right Arrow      |Cursor right                   |
+|Left Arrow       |Cursor left                    |
+|Up Arrow         |Cursor up                      |
+|Down Arrow       |Cursor down                    |
+|Backspace        |remove character before cursor |
+|Delete           |remove character at cursor     |
+|Ctrl Backspace   |remove word before cursor      |
+|Ctrl Delete      |remove word after cursor       |
+|Enter            |insert a newline               |
+|Home             |Cursor to line beginning       |
+|End              |Cursor to line end             |
+|Ctrl Home        |Cursor to file beginning       |
+|Ctrl End         |Cursor to file end             |
+|Ctrl Up          |Cursor to previous empty line  |
+|Ctrl Down        |Cursor to next empty line      |
+|PageUp           |Cursor moves 10 lines up       |
+|PageDown         |Cursor moves 10 lines down     |
 |Shift \[movement]|Select stuff on cursor movement|
-|Backspace/Delete|Deletes selection              |
-|Escape          |Clears selection               |
-|Ctrl A          |Select all                     |
-|Ctrl C          |Copy selection or current line |
-|Ctrl V          |Paste into editor              |
+|Backspace/Delete |Deletes selection              |
+|Escape           |Clears selection               |
+|Ctrl A           |Select all                     |
+|Ctrl C           |Copy selection or current line |
+|Ctrl X           |Cut selection or current line  |
+|Ctrl V           |Paste into editor              |
 
 ## TODO
 
