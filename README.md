@@ -52,3 +52,5 @@ Just writing this for fun in C with raylib for rendering.
 - [x] copy paste functionality
 - [ ] when saving: append `\n` char to end of buffer if no `\n` exists as the last
   character
+- [ ] create new file in editor / open existing files
+    - some kind of filepicker?

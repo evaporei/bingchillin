@@ -8,7 +8,6 @@
 #ifdef BUILD_RELEASE
 #include "build/font.h"
 #endif
-#define DA_IMPLEMENTATION
 #include "dynamic_array.h"
 
 #define LOG(...) TraceLog(LOG_DEBUG, TextFormat(__VA_ARGS__))
@@ -56,7 +55,6 @@ typedef struct {
 } Cursor;
 
 typedef struct {
-    //bool        enabled;
     char*  items; // message string
     size_t size;
     size_t count;
@@ -97,6 +95,11 @@ void notification_issue(Notification *n, const char* message, double timeout)
     strcpy(n->items, message);
 
     n->timer = timeout;
+}
+
+void notification_clear(Notification *n)
+{
+    n->timer = 0.0;
 }
 
 size_t cursor_get_row(Cursor *c, Lines lines)
@@ -626,9 +629,12 @@ void editor_load_file(Editor *e, const char *filename)
 
 void editor_save_file(Editor *e)
 {
+    if (e->filename == NULL)
+    {
+        notification_issue(&e->notif, "Can not save: File does not exist", 1);
+        return;
+    }
     notification_issue(&e->notif, TextFormat("Saving to file: %s", e->filename), 1);
-
-    if (e->filename == NULL) return;
 
     // open file for writing
     FILE *f = fopen(e->filename, "w");
@@ -653,7 +659,7 @@ void editor_draw_text(Editor *e, const char* text, Vector2 pos, Color color)
     DrawTextEx(e->font, text, pos, e->fontSize, e->fontSpacing, color);
 }
 
-bool update(Editor *e)
+bool editor_update(Editor *e)
 {
     if (IsKeyDown(KEY_LEFT_CONTROL))
     {
@@ -752,7 +758,15 @@ bool update(Editor *e)
     {
         LOG("Enter key pressed");
         if (e->selection.exists) editor_selection_delete(e);
+        // finds number of spaces on current line
+        int spaces = 0;
+        {
+            const Line currentLine = e->lines.items[e->c.row];
+            for (; e->buffer.items[currentLine.start + spaces] == ' '; spaces++);
+        }
+        // puts same amount of spaces on the new line
         editor_insert_char_at_cursor(e, '\n');
+        for (int i = 0; i<spaces; i++) editor_insert_char_at_cursor(e, ' ');
     }
 
     if (IsKeyPressed(KEY_TAB))
@@ -761,7 +775,11 @@ bool update(Editor *e)
         for (int i=0; i<4; i++) editor_insert_char_at_cursor(e, ' ');
     }
 
-    if (IsKeyPressed(KEY_ESCAPE)) editor_selection_clear(e);
+    if (IsKeyPressed(KEY_ESCAPE))
+    {
+        editor_selection_clear(e);
+        notification_clear(&e->notif);
+    }
 
     if (editor_key_pressed(KEY_BACKSPACE))
     {
@@ -829,7 +847,7 @@ bool update(Editor *e)
     return 0;
 }
 
-void draw(Editor *e)
+void editor_draw(Editor *e)
 {
         BeginDrawing();
         ClearBackground(BG_COLOR);
@@ -977,8 +995,8 @@ int main(int argc, char **argv)
     bool shouldQuit = false;
     while(!WindowShouldClose() && !shouldQuit)
     {
-        shouldQuit = update(&editor);
-        draw(&editor);
+        shouldQuit = editor_update(&editor);
+        editor_draw(&editor);
     }
 
     editor_deinit(&editor);
